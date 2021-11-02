@@ -39,9 +39,6 @@ async def on_message(message):
   if message.author == client.user:
     return
 
-  if message.author.id == 311520465153818624:
-    await message.channel.send("Please don't interact with me Sean")
-
   if message.content.startswith('!StartServer'):
     await message.channel.send('Starting Minecraft server')
     ec2.start_instances(InstanceIds=[os.getenv('MinecraftInstance')], DryRun=False)
@@ -124,7 +121,7 @@ async def check_server_status():
         },
       ],
       StartTime= (datetime.now() - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%S.676Z'), #Locally, I have to adjust for UTC since I'm in -08:00.  + timedelta(hours=6)
-      EndTime= (datetime.now()).strftime('%Y-%m-%dT%H:%M:%S.676Z'), #I have to adjust for UTC since I'm in -08:00.  + timedelta(hours=8)
+      EndTime= (datetime.now()).strftime('%Y-%m-%dT%H:%M:%S.676Z'), #Locally, I have to adjust for UTC since I'm in -08:00.  + timedelta(hours=8)
       LabelOptions={
       }
     )
@@ -152,7 +149,6 @@ async def check_server_status():
 def searchWiki(searchTerm):
     if searchTerm != "":
         result = fandom.search(searchTerm, results = 1)
-        #result = fandom.search('elytra', results = 1)
         page = fandom.page(pageid = result[0][1]) #multi-dimensional array because the first array is the result, and second is the result details
         e = discord.Embed()
         try:
