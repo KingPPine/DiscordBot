@@ -143,7 +143,7 @@ async def check_server_status():
 
       if shutdownServer:
         ec2.stop_instances(InstanceIds=[os.getenv('MinecraftInstance')], DryRun=False)
-        await client.get_channel(897021942689837066).send('Shutting server down due to inactivity')
+        await client.get_channel(os.getenv('DiscordGeneralChannel')).send('Shutting server down due to inactivity')
 
 
 def searchWiki(searchTerm):
