@@ -57,13 +57,8 @@ async def on_message(message):
         result = pullUserStatisticsDatabase(message.author)
         embed = discord.Embed(title="Statistics")
         for line in result:
-            beginTime = line[3]
-            endTime = line[4]
-            if beginTime == '' or endTime == '':
-                break
-
-            timediff = datetime.strptime((line[4].split(".")[0]), '%Y-%m-%d %H:%M:%S') - datetime.strptime((line[3].split(".")[0]), '%Y-%m-%d %H:%M:%S')
-            embed.add_field(name=line[2], value="Time: " + str(timediff), inline=False)
+            #Embed each activity name and their time played
+            embed.add_field(name=line[0], value="Time: " + str(line[1]), inline=False)
             
         await message.channel.send(embed=embed)
 
@@ -80,10 +75,15 @@ async def on_member_update(before:discord.Member, after:discord.Member):
 
     #Add the new activity in the database if it doesn't exits
     cur.execute("INSERT OR IGNORE INTO activities (activity_name) VALUES (?)", (str(afterActivity),))
-    #Add an ending timestamp for the user's previous activity
-    cur.execute("UPDATE OR IGNORE statistics SET end_time = ? WHERE userid = ? AND end_time = ''", (datetime.now(), after.id,))
-    #Add a new entry with a starting timestamp for the new activity
-    cur.execute("INSERT INTO statistics (userid, activity_name, start_time, end_time) VALUES (?,?,?,?)", (after.id, str(afterActivity), datetime.now(), '',))
+
+    cur.execute("SELECT * FROM statistics WHERE userid=? AND end_time = ''",(after.id,))
+    result = cur.fetchone()
+    if (afterActivity != result[2]): #Only close the time on the activity and add a new row if it's actually a different game. I noticed a lot of split entries otherwise
+      #Add an ending timestamp for the user's previous activity
+      cur.execute("UPDATE OR IGNORE statistics SET end_time = ? WHERE userid = ? AND end_time = ''", (datetime.now(), after.id,))
+      #Add a new entry with a starting timestamp for the new activity
+      cur.execute("INSERT INTO statistics (userid, activity_name, start_time, end_time) VALUES (?,?,?,?)", (after.id, str(afterActivity), datetime.now(), '',))
+
     #Update the member's nickname if it's different
     addNewUserDatabase(after)
     cur.execute("UPDATE users SET username = ? WHERE userid = ?", (str(after.display_name), after.id,))
@@ -200,29 +200,35 @@ def pullUserStatisticsDatabase(member:discord.member):
     cur.execute("SELECT * FROM statistics WHERE userid=? ORDER BY activity_name ASC",(member.id,))
     result = cur.fetchall()
 
-    listFormat = []
+    listFormat = [] #list of activities and their time played
     i = 0 #represents the activity
     for line in result:
+      if line[4] != '': #only process the line if there's an end time
         if i == 0:
-            listFormat.append(line)
-            i += 1
-        elif line[2] == listFormat[i-1][2]:
-            #If it's the same name, check if the end time is bigger and the start time is smaller. Overwrite
-            prevStartTime:datetime = datetime.strptime((listFormat[i-1][3].split(".")[0]), '%Y-%m-%d %H:%M:%S')
-            newStartTime:datetime = datetime.strptime((line[3].split(".")[0]), '%Y-%m-%d %H:%M:%S')
-            if newStartTime - prevStartTime < timedelta(minutes=0):
-                newline = (listFormat[i-1][0], listFormat[i-1][1], listFormat[i-1][2], str(newStartTime), listFormat[i-1][4])
-                listFormat[i-1] = newline
+            #First row, we know we can simply add the activity
+            startTime:datetime = datetime.strptime((line[3].split(".")[0]), '%Y-%m-%d %H:%M:%S')
+            endTime:datetime = datetime.strptime((line[4].split(".")[0]), '%Y-%m-%d %H:%M:%S')
+            timeDiff = endTime - startTime
+            newline = [line[2],timeDiff] #activity, and time difference
 
-            prevEndTime:datetime = datetime.strptime((listFormat[i-1][4].split(".")[0]), '%Y-%m-%d %H:%M:%S')
-            if line[4] != '':
-                newEndTime:datetime = datetime.strptime((line[4].split(".")[0]), '%Y-%m-%d %H:%M:%S')
-                if newEndTime - prevEndTime > timedelta(minutes=0):
-                    newline = (listFormat[i-1][0], listFormat[i-1][1], listFormat[i-1][2], listFormat[i-1][3], str(newStartTime))
-                    listFormat[i-1] = newline 
+            listFormat.append(newline)
+            i += 1
+
+        elif line[2] == listFormat[i-1][0]:
+            #If it's the same name, add the new time difference onto the previous one
+            startTime:datetime = datetime.strptime((line[3].split(".")[0]), '%Y-%m-%d %H:%M:%S')
+            endTime:datetime = datetime.strptime((line[4].split(".")[0]), '%Y-%m-%d %H:%M:%S')
+            timeDiff = endTime - startTime
+            listFormat[i-1][1] = listFormat[i-1][1] + timeDiff
+
         elif line[2] != 'None':
-            #If it's not the same and also not "none", append 
-            listFormat.append(line)
+            #If it's not the same and also not "none", append a new line
+            startTime:datetime = datetime.strptime((line[3].split(".")[0]), '%Y-%m-%d %H:%M:%S')
+            endTime:datetime = datetime.strptime((line[4].split(".")[0]), '%Y-%m-%d %H:%M:%S')
+            timeDiff = endTime - startTime
+            newline = [line[2],timeDiff] #activity, and time difference
+
+            listFormat.append(newline)
             i += 1
 
     return listFormat
